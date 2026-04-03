@@ -38,15 +38,13 @@ class LiteRTLMBridge {
       // Clean up any previously loaded model
       _unloadModel()
 
-      // Build engine settings
-      guard let settings = litert_lm_engine_settings_create() else {
+      // Build engine settings (new API takes all params in create)
+      guard let settings = litert_lm_engine_settings_create(path, backend, nil, nil) else {
         throw LiteRTLMError.engineCreationFailed
       }
-      defer { litert_lm_engine_settings_destroy(settings) }
+      defer { litert_lm_engine_settings_delete(settings) }
 
-      litert_lm_engine_settings_set_model_path(settings, path)
-      litert_lm_engine_settings_set_backend(settings, backend)
-      litert_lm_engine_settings_set_max_tokens(settings, Int32(maxTokens))
+      litert_lm_engine_settings_set_max_num_tokens(settings, Int32(maxTokens))
 
       // Set cache directory
       let cacheDir = FileManager.default
@@ -75,29 +73,35 @@ class LiteRTLMBridge {
       }
 
       // Create session
-      guard let newSession = litert_lm_session_create(engine) else {
+      guard let newSession = litert_lm_engine_create_session(engine, nil) else {
         throw LiteRTLMError.sessionCreationFailed
       }
       defer {
-        litert_lm_session_destroy(newSession)
+        litert_lm_session_delete(newSession)
       }
 
       // Build text input
-      var input = LiteRtLmInputData()
+      let promptData = Array(prompt.utf8)
+      var input = InputData()
       input.type = kInputText
-      input.text = (prompt as NSString).utf8String
 
-      // Call generate
-      guard let result = litert_lm_generate_content(newSession, &input, 1) else {
-        throw LiteRTLMError.inferenceError("generate_content returned nil")
+      let result: String = try promptData.withUnsafeBufferPointer { buf in
+        input.data = UnsafeRawPointer(buf.baseAddress)
+        input.size = buf.count
+
+        guard let responses = litert_lm_session_generate_content(newSession, &input, 1) else {
+          throw LiteRTLMError.inferenceError("generate_content returned nil")
+        }
+        defer { litert_lm_responses_delete(responses) }
+
+        guard let responseText = litert_lm_responses_get_response_text_at(responses, 0) else {
+          throw LiteRTLMError.inferenceError("result contained no text")
+        }
+
+        return String(cString: responseText)
       }
-      defer { litert_lm_result_destroy(result) }
 
-      guard let responseText = litert_lm_result_get_text(result) else {
-        throw LiteRTLMError.inferenceError("result contained no text")
-      }
-
-      return String(cString: responseText)
+      return result
     }
   }
 
@@ -110,43 +114,50 @@ class LiteRTLMBridge {
       }
 
       // Create session
-      guard let newSession = litert_lm_session_create(engine) else {
+      guard let newSession = litert_lm_engine_create_session(engine, nil) else {
         throw LiteRTLMError.sessionCreationFailed
       }
       defer {
-        litert_lm_session_destroy(newSession)
+        litert_lm_session_delete(newSession)
       }
 
       // Build multimodal input array: text + image + imageEnd
+      let promptBytes = Array(prompt.utf8)
       let imageBytes = [UInt8](imageData)
 
-      var textInput = LiteRtLmInputData()
-      textInput.type = kInputText
-      textInput.text = (prompt as NSString).utf8String
+      let result: String = try promptBytes.withUnsafeBufferPointer { promptBuf in
+        try imageBytes.withUnsafeBufferPointer { imageBuf in
+          var textInput = InputData()
+          textInput.type = kInputText
+          textInput.data = UnsafeRawPointer(promptBuf.baseAddress)
+          textInput.size = promptBuf.count
 
-      var imageInput = LiteRtLmInputData()
-      imageInput.type = kInputImage
-      imageBytes.withUnsafeBytes { ptr in
-        imageInput.image_data = ptr.baseAddress?.assumingMemoryBound(to: UInt8.self)
-        imageInput.image_size = Int32(imageBytes.count)
+          var imageInput = InputData()
+          imageInput.type = kInputImage
+          imageInput.data = UnsafeRawPointer(imageBuf.baseAddress)
+          imageInput.size = imageBuf.count
+
+          var imageEndInput = InputData()
+          imageEndInput.type = kInputImageEnd
+          imageEndInput.data = nil
+          imageEndInput.size = 0
+
+          var inputs: [InputData] = [textInput, imageInput, imageEndInput]
+
+          guard let responses = litert_lm_session_generate_content(newSession, &inputs, inputs.count) else {
+            throw LiteRTLMError.inferenceError("generate_content returned nil")
+          }
+          defer { litert_lm_responses_delete(responses) }
+
+          guard let responseText = litert_lm_responses_get_response_text_at(responses, 0) else {
+            throw LiteRTLMError.inferenceError("result contained no text")
+          }
+
+          return String(cString: responseText)
+        }
       }
 
-      var imageEndInput = LiteRtLmInputData()
-      imageEndInput.type = kInputImageEnd
-
-      var inputs: [LiteRtLmInputData] = [textInput, imageInput, imageEndInput]
-
-      // Call generate
-      guard let result = litert_lm_generate_content(newSession, &inputs, Int32(inputs.count)) else {
-        throw LiteRTLMError.inferenceError("generate_content returned nil")
-      }
-      defer { litert_lm_result_destroy(result) }
-
-      guard let responseText = litert_lm_result_get_text(result) else {
-        throw LiteRTLMError.inferenceError("result contained no text")
-      }
-
-      return String(cString: responseText)
+      return result
     }
   }
 
@@ -161,11 +172,11 @@ class LiteRTLMBridge {
   // Private unload — must be called from within queue.sync block
   private func _unloadModel() {
     if let s = session {
-      litert_lm_session_destroy(s)
+      litert_lm_session_delete(s)
       session = nil
     }
     if let e = engine {
-      litert_lm_engine_destroy(e)
+      litert_lm_engine_delete(e)
       engine = nil
     }
     isLoaded = false
