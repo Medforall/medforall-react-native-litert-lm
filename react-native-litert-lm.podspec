@@ -18,8 +18,8 @@ Pod::Spec.new do |s|
 
   s.pod_target_xcconfig = {
     'HEADER_SEARCH_PATHS' => '"$(PODS_TARGET_SRCROOT)/ios/Vendor/include"',
-    'SWIFT_OBJC_BRIDGING_HEADER' => '$(PODS_TARGET_SRCROOT)/ios/LiteRTLM/react-native-litert-lm-Bridging-Header.h',
     'OTHER_LDFLAGS' => '-lc++',
+    'SWIFT_INCLUDE_PATHS' => '"$(PODS_TARGET_SRCROOT)/ios/Vendor/include"',
   }
 
   s.dependency 'React-Core'
