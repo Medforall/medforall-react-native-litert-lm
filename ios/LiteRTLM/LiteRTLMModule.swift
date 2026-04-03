@@ -23,7 +23,7 @@ class LiteRTLMModule: NSObject {
             reject("INVALID_URL", "The provided URL is invalid: \(url)", nil)
             return
         }
-        manager.downloadModel(from: modelURL) { result in
+        manager.downloadModel(from: modelURL, onProgress: { _ in }) { result in
             switch result {
             case .success(let path):
                 resolve(path)
