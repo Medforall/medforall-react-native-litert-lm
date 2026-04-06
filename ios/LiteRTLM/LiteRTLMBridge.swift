@@ -33,7 +33,7 @@ class LiteRTLMBridge {
 
   // MARK: - Model Loading
 
-  func loadModel(at path: String, backend: String = "cpu", maxTokens: Int = 4096) throws {
+  func loadModel(at path: String, backend: String = "cpu", maxTokens: Int = 1024) throws {
     try queue.sync {
       // Clean up any previously loaded model
       _unloadModel()
@@ -46,13 +46,13 @@ class LiteRTLMBridge {
 
       litert_lm_engine_settings_set_max_num_tokens(settings, Int32(maxTokens))
 
-      // Set cache directory
-      let cacheDir = FileManager.default
+      // Ensure cache directory exists
+      let cacheDirURL = FileManager.default
         .urls(for: .cachesDirectory, in: .userDomainMask)
         .first!
         .appendingPathComponent("litert-lm-cache")
-        .path
-      litert_lm_engine_settings_set_cache_dir(settings, cacheDir)
+      try? FileManager.default.createDirectory(at: cacheDirURL, withIntermediateDirectories: true)
+      litert_lm_engine_settings_set_cache_dir(settings, cacheDirURL.path)
 
       // Create engine
       guard let newEngine = litert_lm_engine_create(settings) else {
@@ -66,14 +66,23 @@ class LiteRTLMBridge {
 
   // MARK: - Text Generation
 
+  private func createSessionConfig(maxOutputTokens: Int = 512) -> OpaquePointer? {
+    guard let config = litert_lm_session_config_create() else { return nil }
+    litert_lm_session_config_set_max_output_tokens(config, Int32(maxOutputTokens))
+    return config
+  }
+
   func generateText(prompt: String) throws -> String {
     return try queue.sync {
       guard isLoaded, let engine = engine else {
         throw LiteRTLMError.modelNotLoaded
       }
 
-      // Create session
-      guard let newSession = litert_lm_engine_create_session(engine, nil) else {
+      // Create session with config
+      let config = createSessionConfig()
+      defer { if let c = config { litert_lm_session_config_delete(c) } }
+
+      guard let newSession = litert_lm_engine_create_session(engine, config) else {
         throw LiteRTLMError.sessionCreationFailed
       }
       defer {
@@ -113,8 +122,11 @@ class LiteRTLMBridge {
         throw LiteRTLMError.modelNotLoaded
       }
 
-      // Create session
-      guard let newSession = litert_lm_engine_create_session(engine, nil) else {
+      // Create session with config
+      let config = createSessionConfig()
+      defer { if let c = config { litert_lm_session_config_delete(c) } }
+
+      guard let newSession = litert_lm_engine_create_session(engine, config) else {
         throw LiteRTLMError.sessionCreationFailed
       }
       defer {
