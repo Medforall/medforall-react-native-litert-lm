@@ -11,7 +11,8 @@ if [ ! -f "$LIB_PATH" ]; then
   needs_download=true
 elif file "$LIB_PATH" | grep -q "text\|ASCII"; then
   needs_download=true
-elif [ "$(wc -c < "$LIB_PATH" | tr -d ' ')" -lt 1000 ]; then
+elif [ "$(wc -c < "$LIB_PATH" | tr -d ' ')" -lt 100000000 ]; then
+  # Real binary is ~281MB; anything under 100MB is wrong
   needs_download=true
 fi
 
