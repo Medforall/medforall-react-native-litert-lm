@@ -1,16 +1,18 @@
 {
   "name": "@medforall/react-native-litert-lm",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "React Native bridge for Google LiteRT-LM on-device inference",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "files": [
     "src/",
     "ios/",
+    "scripts/",
     "app.plugin.js",
     "react-native-litert-lm.podspec"
   ],
   "scripts": {
+    "postinstall": "bash scripts/postinstall.sh",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
