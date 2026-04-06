@@ -3,7 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VENDOR_DIR="$SCRIPT_DIR/../ios/Vendor"
 LIB_PATH="$VENDOR_DIR/libLiteRTLM.a"
-RELEASE_URL="https://github.com/Medforall/medforall-react-native-litert-lm/releases/download/v0.1.1/libLiteRTLM.a"
+RELEASE_URL="https://github.com/Medforall/medforall-react-native-litert-lm/releases/download/v0.1.3/engine_cpu_fat.a"
 
 needs_download=false
 
