@@ -16,10 +16,16 @@ Pod::Spec.new do |s|
   s.vendored_libraries = 'ios/Vendor/libLiteRTLM.a'
   s.preserve_paths = 'ios/Vendor/include/**/*.h', 'ios/Vendor/prebuilt/**/*'
 
+  # Pod target: compiler/header settings only (no linker flags — static lib targets don't run ld)
   s.pod_target_xcconfig = {
     'HEADER_SEARCH_PATHS' => '"$(PODS_TARGET_SRCROOT)/ios/Vendor/include"',
-    'OTHER_LDFLAGS' => '-lc++ -lz -force_load "$(PODS_TARGET_SRCROOT)/ios/Vendor/libLiteRTLM.a"',
     'SWIFT_INCLUDE_PATHS' => '"$(PODS_TARGET_SRCROOT)/ios/Vendor/include"',
+  }
+
+  # App target: linker flags (this is where ld runs and -force_load takes effect)
+  # -force_load ensures C++ static initializers in engine_impl.o are preserved
+  s.user_target_xcconfig = {
+    'OTHER_LDFLAGS' => '-lc++ -lz -force_load "${PODS_ROOT}/../../node_modules/@medforall/react-native-litert-lm/ios/Vendor/libLiteRTLM.a"',
   }
 
   s.dependency 'React-Core'
