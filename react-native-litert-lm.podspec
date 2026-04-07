@@ -18,7 +18,7 @@ Pod::Spec.new do |s|
 
   s.pod_target_xcconfig = {
     'HEADER_SEARCH_PATHS' => '"$(PODS_TARGET_SRCROOT)/ios/Vendor/include"',
-    'OTHER_LDFLAGS' => '-lc++',
+    'OTHER_LDFLAGS' => '-lc++ -lz -force_load "$(PODS_TARGET_SRCROOT)/ios/Vendor/libLiteRTLM.a"',
     'SWIFT_INCLUDE_PATHS' => '"$(PODS_TARGET_SRCROOT)/ios/Vendor/include"',
   }
 

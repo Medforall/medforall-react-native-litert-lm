@@ -50,6 +50,9 @@ class LiteRTLMBridge {
 
       NSLog("[LiteRTLM] loadModel: path=%@, backend=%@, maxTokens=%d", path, backend, maxTokens)
 
+      // Enable verbose native logging from LiteRT LM
+      litert_lm_set_min_log_level(0)
+
       // Build engine settings (new API takes all params in create)
       guard let settings = litert_lm_engine_settings_create(path, backend, nil, nil) else {
         NSLog("[LiteRTLM] FAILED: litert_lm_engine_settings_create returned nil")
