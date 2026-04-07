@@ -13,8 +13,7 @@ Pod::Spec.new do |s|
   s.platforms    = { :ios => '17.0' }
 
   s.source_files = 'ios/LiteRTLM/**/*.{swift,h,m}'
-  s.vendored_libraries = 'ios/Vendor/libLiteRTLM.a'
-  s.preserve_paths = 'ios/Vendor/include/**/*.h', 'ios/Vendor/prebuilt/**/*'
+  s.preserve_paths = 'ios/Vendor/libLiteRTLM.a', 'ios/Vendor/include/**/*.h', 'ios/Vendor/prebuilt/**/*'
 
   # Pod target: compiler/header settings only (no linker flags — static lib targets don't run ld)
   s.pod_target_xcconfig = {
