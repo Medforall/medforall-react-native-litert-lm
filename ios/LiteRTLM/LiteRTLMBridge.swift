@@ -3,12 +3,22 @@ import LiteRTLMEngine
 
 // MARK: - Errors
 
-enum LiteRTLMError: Error {
+enum LiteRTLMError: LocalizedError {
   case engineCreationFailed
   case sessionCreationFailed
   case inferenceError(String)
   case modelNotLoaded
   case unsupportedDevice
+
+  var errorDescription: String? {
+    switch self {
+    case .engineCreationFailed: return "Engine creation failed — model file may be corrupt or incompatible with CPU backend"
+    case .sessionCreationFailed: return "Session creation failed — insufficient memory or invalid config"
+    case .inferenceError(let msg): return "Inference error: \(msg)"
+    case .modelNotLoaded: return "Model not loaded — call loadModel() first"
+    case .unsupportedDevice: return "Device not supported for on-device inference"
+    }
+  }
 }
 
 // MARK: - LiteRTLMBridge
@@ -38,12 +48,16 @@ class LiteRTLMBridge {
       // Clean up any previously loaded model
       _unloadModel()
 
+      NSLog("[LiteRTLM] loadModel: path=%@, backend=%@, maxTokens=%d", path, backend, maxTokens)
+
       // Build engine settings (new API takes all params in create)
       guard let settings = litert_lm_engine_settings_create(path, backend, nil, nil) else {
+        NSLog("[LiteRTLM] FAILED: litert_lm_engine_settings_create returned nil")
         throw LiteRTLMError.engineCreationFailed
       }
       defer { litert_lm_engine_settings_delete(settings) }
 
+      NSLog("[LiteRTLM] Settings created OK, setting max tokens and cache dir")
       litert_lm_engine_settings_set_max_num_tokens(settings, Int32(maxTokens))
 
       // Ensure cache directory exists
@@ -54,10 +68,13 @@ class LiteRTLMBridge {
       try? FileManager.default.createDirectory(at: cacheDirURL, withIntermediateDirectories: true)
       litert_lm_engine_settings_set_cache_dir(settings, cacheDirURL.path)
 
+      NSLog("[LiteRTLM] Creating engine...")
       // Create engine
       guard let newEngine = litert_lm_engine_create(settings) else {
+        NSLog("[LiteRTLM] FAILED: litert_lm_engine_create returned nil")
         throw LiteRTLMError.engineCreationFailed
       }
+      NSLog("[LiteRTLM] Engine created OK")
 
       engine = newEngine
       isLoaded = true

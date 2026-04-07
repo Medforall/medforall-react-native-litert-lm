@@ -50,11 +50,20 @@ class LiteRTLMModule: NSObject {
     @objc func loadModel(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         queue.async { [weak self] in
             guard let self = self else { return }
+            let path = self.manager.modelPath
+            let fm = FileManager.default
+            let exists = fm.fileExists(atPath: path)
+            var sizeStr = "N/A"
+            if exists, let attrs = try? fm.attributesOfItem(atPath: path),
+               let sz = attrs[.size] as? Int64 {
+                sizeStr = "\(sz / (1024*1024))MB"
+            }
             do {
-                try self.bridge.loadModel(at: self.manager.modelPath)
+                try self.bridge.loadModel(at: path)
                 resolve(true)
             } catch {
-                reject("LOAD_FAILED", error.localizedDescription, error)
+                let detail = "path=\(path), exists=\(exists), size=\(sizeStr), backend=cpu, maxTokens=1024, error=\(error)"
+                reject("LOAD_FAILED", detail, error)
             }
         }
     }
