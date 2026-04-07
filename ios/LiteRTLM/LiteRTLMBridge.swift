@@ -121,12 +121,15 @@ class LiteRTLMBridge {
       }
 
       // Create session with config
+      NSLog("[LiteRTLM] Creating session...")
       let config = createSessionConfig()
       defer { if let c = config { litert_lm_session_config_delete(c) } }
 
       guard let newSession = litert_lm_engine_create_session(engine, config) else {
+        NSLog("[LiteRTLM] FAILED: session creation returned nil")
         throw LiteRTLMError.sessionCreationFailed
       }
+      NSLog("[LiteRTLM] Session created OK")
       defer {
         litert_lm_session_delete(newSession)
       }
@@ -140,8 +143,28 @@ class LiteRTLMBridge {
         input.data = UnsafeRawPointer(buf.baseAddress)
         input.size = buf.count
 
-        guard let responses = litert_lm_session_generate_content(newSession, &input, 1) else {
-          throw LiteRTLMError.inferenceError("generate_content returned nil")
+        NSLog("[LiteRTLM] Calling generate_content with %d bytes input...", buf.count)
+
+        // Capture stderr during inference
+        let stderrPipe = Pipe()
+        let origStderr = dup(STDERR_FILENO)
+        dup2(stderrPipe.fileHandleForWriting.fileDescriptor, STDERR_FILENO)
+
+        let rawResponses = litert_lm_session_generate_content(newSession, &input, 1)
+
+        fflush(stderr)
+        dup2(origStderr, STDERR_FILENO)
+        close(origStderr)
+        stderrPipe.fileHandleForWriting.closeFile()
+        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        let stderrOutput = String(data: stderrData, encoding: .utf8) ?? ""
+        if !stderrOutput.isEmpty {
+          NSLog("[LiteRTLM] generate_content stderr: %@", stderrOutput)
+        }
+
+        guard let responses = rawResponses else {
+          let reason = stderrOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+          throw LiteRTLMError.inferenceError("generate_content returned nil: \(reason.isEmpty ? "no stderr" : String(reason.suffix(300)))")
         }
         defer { litert_lm_responses_delete(responses) }
 
