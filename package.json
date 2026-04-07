@@ -1,6 +1,6 @@
 {
   "name": "@medforall/react-native-litert-lm",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "React Native bridge for Google LiteRT-LM on-device inference",
   "main": "src/index.ts",
   "types": "src/index.ts",

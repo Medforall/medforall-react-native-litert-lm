@@ -72,14 +72,36 @@ class LiteRTLMBridge {
       litert_lm_engine_settings_set_cache_dir(settings, cacheDirURL.path)
 
       NSLog("[LiteRTLM] Creating engine...")
+
+      // Capture stderr during engine creation to surface C++ error messages
+      let stderrPipe = Pipe()
+      let origStderr = dup(STDERR_FILENO)
+      dup2(stderrPipe.fileHandleForWriting.fileDescriptor, STDERR_FILENO)
+
       // Create engine
-      guard let newEngine = litert_lm_engine_create(settings) else {
+      let newEngine = litert_lm_engine_create(settings)
+
+      // Restore stderr and read captured output
+      fflush(stderr)
+      dup2(origStderr, STDERR_FILENO)
+      close(origStderr)
+      stderrPipe.fileHandleForWriting.closeFile()
+      let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+      let stderrOutput = String(data: stderrData, encoding: .utf8) ?? ""
+
+      if !stderrOutput.isEmpty {
+        NSLog("[LiteRTLM] Engine stderr: %@", stderrOutput)
+      }
+
+      guard let createdEngine = newEngine else {
         NSLog("[LiteRTLM] FAILED: litert_lm_engine_create returned nil")
-        throw LiteRTLMError.engineCreationFailed
+        let trimmed = stderrOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let reason = trimmed.isEmpty ? "unknown (no stderr output)" : String(trimmed.suffix(500))
+        throw LiteRTLMError.inferenceError("engineCreationFailed: \(reason)")
       }
       NSLog("[LiteRTLM] Engine created OK")
 
-      engine = newEngine
+      engine = createdEngine
       isLoaded = true
     }
   }
